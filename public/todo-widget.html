@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Todo List</title>
+    <style>
+      :root {
+        color: #0b0b0f;
+        font-family: "Inter", system-ui, -apple-system, sans-serif;
+      }
+
+      html, body {
+        width: 100%;
+        min-height: 100%;
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 16px;
+        background: #f6f8fb;
+      }
+
+      main {
+        width: 100%;
+        max-width: 400px;
+        min-height: 200px;
+        margin: 0 auto;
+        background: #fff;
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+      }
+
+      h2 {
+        margin: 0 0 16px;
+        font-size: 1.25rem;
+      }
+
+      .todo-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      .todo-item {
+        display: flex;
+        align-items: center;
+        padding: 12px;
+        margin-bottom: 8px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        gap: 12px;
+      }
+
+      .todo-item.completed {
+        background: #e8f5e9;
+      }
+
+      .todo-checkbox {
+        width: 20px;
+        height: 20px;
+        border-radius: 4px;
+        border: 2px solid #ddd;
+        flex-shrink: 0;
+      }
+
+      .todo-item.completed .todo-checkbox {
+        background: #4caf50;
+        border-color: #4caf50;
+        position: relative;
+      }
+
+      .todo-item.completed .todo-checkbox::after {
+        content: "✓";
+        color: white;
+        position: absolute;
+        top: -2px;
+        left: 3px;
+        font-size: 14px;
+      }
+
+      .todo-title {
+        flex: 1;
+        font-size: 0.95rem;
+      }
+
+      .todo-item.completed .todo-title {
+        text-decoration: line-through;
+        color: #666;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 32px;
+        color: #999;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h2>Todo List</h2>
+      <ul class="todo-list" id="todoList"></ul>
+    </main>
+
+    <script type="module">
+      const todoListEl = document.querySelector("#todoList");
+
+      const render = () => {
+        console.log("Render called");
+        console.log("window.openai:", window.openai);
+        
+        // Try structuredContent first (for compatibility), then toolOutput
+        const structuredContent = window.openai?.structuredContent || window.openai?.toolOutput;
+        console.log("structuredContent:", structuredContent);
+        
+        if (!structuredContent || !structuredContent.tasks) {
+          todoListEl.innerHTML = '<div class="empty-state">No todos yet. Add one to get started!</div>';
+          return;
+        }
+
+        const tasks = structuredContent.tasks;
+        console.log("tasks:", tasks);
+        
+        if (tasks.length === 0) {
+          todoListEl.innerHTML = '<div class="empty-state">No todos yet. Add one to get started!</div>';
+          return;
+        }
+
+        todoListEl.innerHTML = tasks.map(task => `
+          <li class="todo-item ${task.completed ? 'completed' : ''}">
+            <div class="todo-checkbox"></div>
+            <div class="todo-title">${task.title}</div>
+          </li>
+        `).join('');
+      };
+
+      const handleSetGlobals = (event) => {
+        console.log("openai:set_globals event received:", event.detail);
+        console.log("Full globals object:", JSON.stringify(event.detail?.globals, null, 2));
+        const globals = event.detail?.globals;
+        
+        // Check for either structuredContent or toolOutput
+        if (globals?.structuredContent !== undefined || globals?.toolOutput !== undefined) {
+          // Update window.openai with the globals
+          if (globals.toolOutput) {
+            window.openai = window.openai || {};
+            window.openai.toolOutput = globals.toolOutput;
+          }
+          render();
+        } else {
+          console.warn("structuredContent not found in globals. Available keys:", Object.keys(globals || {}));
+        }
+      };
+
+      window.addEventListener("openai:set_globals", handleSetGlobals, {
+        passive: true,
+      });
+
+      render();
+    </script>
+  </body>
+</html>
